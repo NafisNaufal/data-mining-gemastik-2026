@@ -1,0 +1,85 @@
+# PuskeTB data pipeline configuration
+# All paths are relative to the project root unless absolute.
+
+paths:
+  # Raw TB Portals drops (DUA-protected, never committed).
+  tbportals_root: tbportals
+  genomics_zip: tbportals/genomic/TB_Portals_Published_Genomics_Data_March_2026.zip
+  cxr_meta_zip: tbportals/imaging/March2026/TB_Portals_CXR_March_2026.zip
+  cxr_image_dir: tbportals/imaging/March2026/TB_Portals_CXRs_March_2026   # per-zip image parts + manifest
+
+  # Derived artifacts (gitignored).
+  interim_dir: data/interim       # extracted CSVs, intermediate tables
+  processed_dir: data/processed   # final manifest + splits
+  images_dir: data/images         # decoded, normalized CXR PNGs
+  embeddings_dir: data/embeddings # cached RAD-DINO features
+
+# ---- Label definition -------------------------------------------------------
+labels:
+  # Primary prediction target for the X-ray student (see README "best-practice notes").
+  # rifampicin resistance is the GeneXpert/Xpert MTB-RIF analogue and anchors the C3 triage story.
+  target: rif_resistant
+
+  # Genotypic resistance is read from the per-drug mutation columns in the genomics CSV
+  # ("-" == susceptible, any mutation string == resistant). These drugs get binarized.
+  drug_columns: [isoniazid, rifampicin, ethambutol, pyrazinamide,
+                 levofloxacin, moxifloxacin, amikacin, kanamycin,
+                 capreomycin, streptomycin, ethionamide, linezolid,
+                 bedaquiline, clofazimine, delamanid, cycloserine,
+                 para_aminosalicylic_acid]
+
+  # Curated category already present in the genomics table; used to cross-check rif label.
+  resistance_type_column: drug_resistance_type
+  rif_implying_types: [RR-TB, MDR-TB, Pre-XDR-TB, XDR-TB]
+
+  # Targets for which the teacher receives the *privileged clinical* feature block (LUPI).
+  # Treatment outcome is genomically under-determined (genomics-only AUROC ~0.64) but
+  # strongly predicted by the clinical record (comorbidity, BMI, prior-treatment history;
+  # AUROC ~0.78), which is complementary to the chest film — so distillation has real
+  # cross-modal signal to transfer there. The rifampicin target stays genomics-only
+  # (near-oracle; radiographic ceiling).
+  clinical_targets: [outcome_unfavorable]
+
+# ---- Lineage (contribution C2) ----------------------------------------------
+lineage:
+  main_column: main_lineage
+  sub_column: sub_lineage
+  # Map raw TB-Profiler calls to coarse groups. Mixed/multi-lineage calls -> "mixed".
+  group_map:
+    lineage1: L1
+    lineage2: L2
+    lineage3: L3
+    lineage4: L4
+    lineage5: L5
+    lineage6: L6
+    La1: animal
+    La2: animal
+    "M.canetti": canetti
+  # C2 focus per project decision: stratified eval on the two abundant groups,
+  # with L1/EAI handled as an external transfer-gap analysis (genomics-only).
+  eval_groups: [L2, L4]
+
+# ---- Imaging filtering ------------------------------------------------------
+imaging:
+  # DICOM modality codes to keep: CR (computed radiography), DX (digital radiography),
+  # XC (photographed/scanned film). Drop XA (angiography).
+  keep_modalities: [CR, DX, XC]
+  drop_modalities: [XA]
+  # cxr_outlier flag from TB Portals: keep flagged images but mark them; the modeling
+  # manifest can optionally exclude outliers.
+  exclude_outliers: false
+
+# ---- Splits -----------------------------------------------------------------
+splits:
+  # Patient-grouped (by condition_id) and stratified by lineage_group x target.
+  # A dedicated calibration split is reserved for conformal prediction (C4).
+  fractions: {train: 0.70, calib: 0.10, test: 0.20}
+  stratify_on: [lineage_group, rif_resistant]
+  group_key: condition_id
+  seed: 1426
+
+# ---- Image decoding ---------------------------------------------------------
+decode:
+  out_format: png       # 8-bit normalized PNG
+  long_side_max: 1024   # cap long side; encoder resizes to its own input later
+  clip_percentiles: [0.5, 99.5]  # robust intensity windowing before 8-bit scaling

@@ -1,0 +1,26 @@
+# PuskeTB — install into the `gemastik` conda env (Python 3.10).
+# torch/torchvision are installed from the CUDA 12.1 index:
+#   pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
+
+transformers>=4.44,<4.46
+huggingface_hub
+accelerate
+
+pandas
+numpy
+pyarrow
+pillow
+pyyaml
+scikit-learn
+
+# DICOM decoding (+ JPEG/JPEG2000 transfer syntaxes used by TB Portals)
+pydicom
+pylibjpeg
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg
+
+# students / utilities
+timm
+einops
+safetensors
+tqdm

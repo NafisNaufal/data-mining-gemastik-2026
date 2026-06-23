@@ -1,0 +1,22 @@
+# ── DUA-protected raw data: NEVER commit (TB Portals redistribution prohibited) ──
+tbportals/
+data/
+*.dcm
+*.npy
+
+# Derived artifacts may be large / patient-derived — keep them local.
+data/interim/
+data/processed/
+data/images/
+data/embeddings/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.venv/
+
+# OS / editor
+.DS_Store
+*.swp
